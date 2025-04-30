@@ -15,7 +15,7 @@ services:
       - mongo-config:/data/configdb
 
   sqlexpress:
-    image: mcr.microsoft.com/mssql/server:2019-latest
+    image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: sqlexpress
     restart: always
     ports:
