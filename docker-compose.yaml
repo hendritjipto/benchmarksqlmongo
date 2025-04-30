@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+
+  sqlexpress:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlexpress
+    restart: always
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "YourStrong!Passw0rd"
+      MSSQL_PID: "Express"
+
+volumes:
+  mongo-data:
+    driver: local
+  mongo-config:
+    driver: local
