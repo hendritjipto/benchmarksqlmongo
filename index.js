@@ -19,7 +19,7 @@ const SQL_CONFIG = {
   },
 };
 
-const RECORD_COUNT = 30000;
+const RECORD_COUNT = 10000000;
 
 function getRandomDuration() {
   return faker.number.int({ min: 10000, max: 99999 })
@@ -28,7 +28,11 @@ function getRandomDuration() {
 function generateDataArray() {
   const data = [];
   for (let i = 0; i < RECORD_COUNT; i++) {
-    data.push({
+    const arrayIndex = Math.floor(i / (RECORD_COUNT / 10));
+    if (!data[arrayIndex]) {
+      data[arrayIndex] = [];
+    }
+    data[arrayIndex].push({
       totalDuration: getRandomDuration(),
       createdAt: faker.date.past(),
     });
@@ -47,8 +51,14 @@ async function generateMongoData(data) {
     await collection.deleteMany({});
 
     console.log(`Inserting ${RECORD_COUNT} documents into MongoDB...`);
-    const result = await collection.insertMany(data);
-    console.log(`Inserted ${result.insertedCount} documents into MongoDB.`);
+    // Insert data in chunks to handle the nested array structure
+    let insertedCount = 0;
+    for (const batch of data) {
+      const result = await collection.insertMany(batch);
+      insertedCount += result.insertedCount;
+      process.stdout.write(`Inserted ${insertedCount} / ${RECORD_COUNT}\r`);
+    }
+    //console.log(`Inserted ${result.insertedCount} documents into MongoDB.`);
   } catch (err) {
     console.error('MongoDB error:', err);
   } finally {
@@ -65,7 +75,7 @@ async function generateSqlData(data) {
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='DummyData' AND xtype='U')
       CREATE TABLE DummyData (
         Id INT IDENTITY(1,1) PRIMARY KEY,
-        totalDuration INT NOT NULL,
+        totalDuration BIGINT NOT NULL,
         createdAt DATETIME NOT NULL
       )
     `);
@@ -75,12 +85,22 @@ async function generateSqlData(data) {
 
     console.log(`Inserting ${RECORD_COUNT} rows into SQL Server...`);
 
-    const batchSize = 1000;
+    const batchSize = 10000;
     for (let i = 0; i < RECORD_COUNT; i += batchSize) {
-      const batch = data.slice(i, i + batchSize);
+    // Extract and flatten data from the nested array structure
+    const batch = [];
+    const end = Math.min(i + batchSize, RECORD_COUNT);
+    
+    for (let j = i; j < end; j++) {
+      const arrayIndex = Math.floor(j / (RECORD_COUNT / 10));
+      const innerIndex = j % (RECORD_COUNT / 10);
+      if (data[arrayIndex] && data[arrayIndex][innerIndex]) {
+        batch.push(data[arrayIndex][innerIndex]);
+      }
+    }
 
       const table = new sql.Table('DummyData');
-      table.columns.add('totalDuration', sql.Int, { nullable: false });
+      table.columns.add('totalDuration', sql.BigInt, { nullable: false });
       table.columns.add('createdAt', sql.DateTime, { nullable: false });
 
       batch.forEach(row => {
