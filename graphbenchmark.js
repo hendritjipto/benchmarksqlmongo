@@ -219,10 +219,78 @@ async function createPieChart(mongoTimes, sqlTimes) {
     console.log('Pie chart saved as benchmark_pie.png');
 }
 
+async function createDifferenceChart(mongoTimes, sqlTimes) {
+    const width = 1000;
+    const height = 600;
+    const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height });
+    
+    // Calculate time differences (positive means MongoDB was slower)
+    const timeDiffs = mongoTimes.map((mongoTime, i) => mongoTime - sqlTimes[i]);
+    const avgDiff = timeDiffs.reduce((sum, diff) => sum + diff, 0) / timeDiffs.length;
+
+    const configuration = {
+        type: 'line',
+        data: {
+            labels: Array.from({ length: RUNS }, (_, i) => i + 1),
+            datasets: [
+                {
+                    label: 'Time Difference (MongoDB - SQL Server)',
+                    data: timeDiffs,
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    fill: false,
+                    tension: 0.1
+                },
+                {
+                    label: 'Average Difference',
+                    data: Array(RUNS).fill(avgDiff),
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    borderDash: [5, 5],
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Time Difference Between MongoDB and SQL Server (Positive = MongoDB Slower)',
+                    font: { size: 18 }
+                },
+                legend: { position: 'top' }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Run Number' }
+                },
+                y: {
+                    title: { display: true, text: 'Time Difference (ms)' }
+                }
+            }
+        },
+        plugins: [{
+            id: 'custom_canvas_background_color',
+            beforeDraw: (chart) => {
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-over';
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, chart.width, chart.height);
+                ctx.restore();
+            }
+        }]
+    };
+
+    const imageBuffer = await chartJSNodeCanvas.renderToBuffer(configuration);
+    fs.writeFileSync('benchmark_difference.png', imageBuffer);
+    console.log('Difference chart saved as benchmark_difference.png');
+}
+
 async function main() {
     const { mongoTimes, sqlTimes } = await runBenchmark();
     await createChart(mongoTimes, sqlTimes);
     await createPieChart(mongoTimes, sqlTimes);
+    await createDifferenceChart(mongoTimes, sqlTimes);
 }
 
 main().catch(console.error);
